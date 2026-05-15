@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginSchema } from "@/features/auth/schemas/auth.schema";
-import { loginAction } from "@/features/auth/actions/auth.actions";
+import { loginAction } from "@/features/auth/actions/auth.write.action";
 import { UI } from "@/features/auth/config/auth.constants";
 
 export function useLoginForm() {

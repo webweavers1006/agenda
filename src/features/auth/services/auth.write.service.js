@@ -1,9 +1,13 @@
 import bcrypt from "bcryptjs";
-import { findUserByEmail, findUserWithPasswordByEmail } from "@/features/auth/repositories/auth.repository";
+import { findUserByEmail, findUserWithPasswordByEmail } from "@/features/auth/repositories/auth.read.repository";
 import { validateUserActive } from "@/features/auth/services/auth.validation.service";
 import { toSessionPayload } from "@/features/auth/mappers/auth.mapper";
 import { ERRORS } from "@/features/auth/config/auth.constants";
 
+/**
+ * Authenticates a user with email and password.
+ * Returns { success, payload, error }.
+ */
 export async function authenticateUser(email, password) {
   const user = await findUserByEmail(email);
 
