@@ -8,10 +8,13 @@ export function toDomain(entity) {
 
   return {
     id: entity.id,
-    name: entity.name,
+    firstName: entity.firstName,
+    lastName: entity.lastName,
     email: entity.email,
-    role: entity.role,
+    idNumber: entity.idNumber,
+    role: entity.role?.name ?? null,
     isActive: entity.isActive,
+    areaId: entity.areaId,
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
   };
@@ -23,19 +26,24 @@ export function toDomainList(entities) {
 
 export function toPersistence(domain) {
   return {
-    name: domain.name,
+    firstName: domain.firstName,
+    lastName: domain.lastName,
     email: domain.email,
+    idNumber: domain.idNumber,
     passwordHash: domain.passwordHash,
-    role: domain.role,
+    roleId: domain.roleId,
+    areaId: domain.areaId,
     isActive: domain.isActive,
   };
 }
 
 export function toSortKey(domainKey) {
   const sortMap = {
-    name: { name: "asc" },
+    firstName: { firstName: "asc" },
+    lastName: { lastName: "asc" },
     email: { email: "asc" },
-    role: { role: "asc" },
+    role: { role: { name: "asc" } },
+    isActive: { isActive: "desc" },
     createdAt: { createdAt: "desc" },
   };
 
@@ -45,7 +53,7 @@ export function toSortKey(domainKey) {
 export function toSessionPayload(user) {
   return {
     id: user.id,
-    name: user.name,
+    name: `${user.firstName} ${user.lastName}`,
     email: user.email,
     role: user.role,
   };

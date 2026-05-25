@@ -7,430 +7,502 @@ datasource db {
 }
 
 // ======================================================
-// MÓDULO DE USUARIOS, ROLES, PERMISOS Y ÁREAS
+// USERS, ROLES, PERMISSIONS & AREAS MODULE
 // ======================================================
 
-model usuarios {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @db.VarChar(255)
-  apellido   String   @db.VarChar(255)
-  email      String   @unique @db.VarChar(255)
-  cedula     String   @unique @db.VarChar(20)
-  password   String?  @db.VarChar(255)
-  es_activo  Boolean? @default(true)
-  area_id    String?  @db.Uuid
-  rol_id     Int?
-  created_at DateTime? @default(now()) @db.Timestamptz(6)
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firstName    String   @map("nombre") @db.VarChar(255)
+  lastName     String   @map("apellido") @db.VarChar(255)
+  email        String   @unique @db.VarChar(255)
+  idNumber     String   @unique @map("cedula") @db.VarChar(20)
+  passwordHash String?  @map("password") @db.VarChar(255)
+  isActive     Boolean  @default(true) @map("es_activo")
+  areaId       String?  @map("area_id") @db.Uuid
+  roleId       Int?     @map("rol_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  areas_pertenece areas?                @relation("usuarios_area_idToareas", fields: [area_id], references: [id])
-  roles           roles?                @relation(fields: [rol_id], references: [id])
+  area                Area?              @relation("UserArea", fields: [areaId], references: [id])
+  role                Role?              @relation(fields: [roleId], references: [id])
 
-  actividades_creadas   actividad[]      @relation("Creador")
-  ejecuciones_realizadas ejecucion[]     @relation("Ejecutor")
-  logs_actividad        log_actividad[]
+  createdActivities      Activity[]               @relation("Creator")
+  approvedActivities     Activity[]               @relation("Approver")
+  executionsPerformed    Execution[]              @relation("Executor")
+  activityLogs           ActivityLog[]
+  ledAreas               Area[]                   @relation("UserLeaderArea")
+  supervisionPermissions SupervisionPermission[]
+
+  @@map("usuarios")
 }
 
-model roles {
-  id             Int              @id @default(autoincrement())
-  nombre         String           @unique @db.VarChar(50)
-  descripcion    String?
-  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
-  roles_permisos roles_permisos[]
-  usuarios       usuarios[]
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @map("nombre") @db.VarChar(50)
+  description String?  @map("descripcion")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rolePermissions RolePermission[]
+  users           User[]
+
+  @@map("roles")
 }
 
-model permisos_sistema {
-  id             Int              @id @default(autoincrement())
-  slug           String           @unique @db.VarChar(100)
-  descripcion    String?
-  roles_permisos roles_permisos[]
+model SystemPermission {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique @db.VarChar(100)
+  description String?  @map("descripcion")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rolePermissions RolePermission[]
+
+  @@map("permisos_sistema")
 }
 
-model roles_permisos {
-  rol_id           Int
-  permiso_id       Int
-  permisos_sistema permisos_sistema @relation(fields: [permiso_id], references: [id])
-  roles            roles            @relation(fields: [rol_id], references: [id])
+model RolePermission {
+  roleId       Int @map("rol_id")
+  permissionId Int @map("permiso_id")
 
-  @@id([rol_id, permiso_id])
+  systemPermission SystemPermission @relation(fields: [permissionId], references: [id])
+  role             Role             @relation(fields: [roleId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("roles_permisos")
 }
 
-model areas {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @db.VarChar(255)
-  parent_id  String?  @db.Uuid
-  jefe_id    String?  @db.Uuid
-  tipo_id    Int?
-  created_at DateTime? @default(now()) @db.Timestamptz(6)
+model Area {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @map("nombre") @db.VarChar(255)
+  parentId  String?  @map("parent_id") @db.Uuid
+  leaderId  String?  @map("jefe_id") @db.Uuid
+  typeId    Int?     @map("tipo_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  areas_parent           areas?                @relation("areas_tree", fields: [parent_id], references: [id])
-  areas_children         areas[]               @relation("areas_tree")
-  cat_tipos_area         cat_tipos_area?       @relation(fields: [tipo_id], references: [id])
-  usuarios_jefe          usuarios?             @relation("usuarios_jefe_area", fields: [jefe_id], references: [id])
-  usuarios_miembros      usuarios[]            @relation("usuarios_area_idToareas")
-  permiso_supervision    permiso_supervision[]
+  parent                 Area?                     @relation("AreaTree", fields: [parentId], references: [id])
+  children               Area[]                    @relation("AreaTree")
+  areaType               AreaType?                 @relation(fields: [typeId], references: [id])
+  leader                 User?                     @relation("UserLeaderArea", fields: [leaderId], references: [id])
+  members                User[]                    @relation("UserArea")
+  supervisionPermissions SupervisionPermission[]
 
-  planificaciones_oficina_ planificacion[] @relation("OficinaResponsable")
-  ejecuciones_oficina_    ejecucion[]     @relation("OficinaEjecutora")
+  responsiblePlannings Planning[]   @relation("ResponsibleOffice")
+  executingExecutions  Execution[]  @relation("ExecutingOffice")
+
+  @@map("areas")
 }
 
-model cat_tipos_area {
-  id               Int     @id @default(autoincrement())
-  nombre           String  @unique @db.VarChar(50)
-  nivel_jerarquico Int
-  areas            areas[]
+model AreaType {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique @map("nombre") @db.VarChar(50)
+  hierarchyLevel Int      @map("nivel_jerarquico")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  areas Area[]
+
+  @@map("cat_tipos_area")
 }
 
-model permiso_supervision {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  usuario_id String    @db.Uuid
-  area_id    String    @db.Uuid
-  created_at DateTime? @default(now()) @db.Timestamptz(6)
-  areas      areas     @relation(fields: [area_id], references: [id])
-  usuarios   usuarios  @relation(fields: [usuario_id], references: [id])
+model SupervisionPermission {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("usuario_id") @db.Uuid
+  areaId    String   @map("area_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@unique([usuario_id, area_id])
+  area Area @relation(fields: [areaId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, areaId])
+  @@map("permiso_supervision")
 }
 
 // ======================================================
-// MÓDULO DE AGENDA Y EJECUCIÓN DE ACTIVIDADES
+// ACTIVITY AGENDA & EXECUTION MODULE
 // ======================================================
 
-// ------------------------------
-// Catálogos básicos
-// ------------------------------
+model ActivityType {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @map("nombre") @db.VarChar(100)
+  slug      String   @unique @db.VarChar(100)
+  sortOrder Int      @default(0) @map("orden")
+  isActive  Boolean  @default(true) @map("activo")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-model tipo_actividad {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @unique @db.VarChar(100)
-  slug       String   @unique @db.VarChar(100)
-  orden      Int      @default(0)
-  activo     Boolean  @default(true)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+  plannings Planning[]
 
-  planificaciones planificacion[]
+  @@map("tipo_actividad")
 }
 
-model prioridad {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @unique @db.VarChar(50)
-  slug       String   @unique @db.VarChar(50)
-  color_hex  String?  @db.VarChar(7)
-  orden      Int      @default(0)
-  activo     Boolean  @default(true)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+model Priority {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @map("nombre") @db.VarChar(50)
+  slug      String   @unique @db.VarChar(50)
+  colorHex  String?  @map("color_hex") @db.VarChar(7)
+  sortOrder Int      @default(0) @map("orden")
+  isActive  Boolean  @default(true) @map("activo")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  planificaciones planificacion[]
+  plannings Planning[]
+
+  @@map("prioridad")
 }
 
-model vertice_impacto {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @unique @db.VarChar(100)
-  slug       String   @unique @db.VarChar(100)
-  orden      Int      @default(0)
-  activo     Boolean  @default(true)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+model ImpactVertex {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @map("nombre") @db.VarChar(100)
+  slug      String   @unique @db.VarChar(100)
+  sortOrder Int      @default(0) @map("orden")
+  isActive  Boolean  @default(true) @map("activo")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  planificaciones planificacion[]
+  plannings Planning[]
+
+  @@map("vertice_impacto")
 }
 
-model linea_estrategica {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @unique @db.VarChar(200)
-  slug       String   @unique @db.VarChar(200)
-  orden      Int      @default(0)
-  activo     Boolean  @default(true)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+model StrategicLine {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @map("nombre") @db.VarChar(200)
+  slug      String   @unique @db.VarChar(200)
+  sortOrder Int      @default(0) @map("orden")
+  isActive  Boolean  @default(true) @map("activo")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  ejecuciones ejecucion[]
+  executions Execution[]
+
+  @@map("linea_estrategica")
 }
 
-model tipo_publico {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @unique @db.VarChar(100)
-  slug       String   @unique @db.VarChar(100)
-  orden      Int      @default(0)
-  activo     Boolean  @default(true)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+model AudienceType {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @map("nombre") @db.VarChar(100)
+  slug      String   @unique @db.VarChar(100)
+  sortOrder Int      @default(0) @map("orden")
+  isActive  Boolean  @default(true) @map("activo")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  actividad_publico actividad_publico[]
+  activityAudiences ActivityAudience[]
+
+  @@map("tipo_publico")
 }
 
-model opcion_participacion_autoridades {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  valor      String   @unique @db.VarChar(50)
-  slug       String   @unique @db.VarChar(50)
-  orden      Int      @default(0)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+model AuthorityParticipationOption {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  value     String   @unique @map("valor") @db.VarChar(50)
+  slug      String   @unique @db.VarChar(50)
+  sortOrder Int      @default(0) @map("orden")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  planificaciones planificacion[]
+  plannings Planning[]
+
+  @@map("opcion_participacion_autoridades")
 }
 
-model espacio_sapi {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @unique @db.VarChar(255)
-  slug       String   @unique @db.VarChar(255)
-  capacidad  Int?
-  ubicacion  String?  @db.VarChar(255)
-  activo     Boolean  @default(true)
-  orden      Int      @default(0)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+model SapiSpace {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @map("nombre") @db.VarChar(255)
+  slug      String   @unique @db.VarChar(255)
+  capacity  Int?     @map("capacidad")
+  location  String?  @map("ubicacion") @db.VarChar(255)
+  isActive  Boolean  @default(true) @map("activo")
+  sortOrder Int      @default(0) @map("orden")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  planificaciones planificacion[]
-}
+  plannings Planning[]
 
-// ------------------------------
-// Entidades externas
-// ------------------------------
-
-model entidad {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @unique @db.VarChar(255)
-  sigla      String?  @db.VarChar(50)
-  tipo       String?  @db.VarChar(50)
-  activo     Boolean  @default(true)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-
-  planificaciones_ente_encargado     planificacion[] @relation("EnteEncargado")
-  planificaciones_institucion_convoca planificacion[] @relation("InstitucionConvoca")
-}
-
-// ------------------------------
-// Contactos
-// ------------------------------
-
-model contacto {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @db.VarChar(255)
-  telefono   String   @db.VarChar(50)
-  email      String?  @db.VarChar(255)
-  cargo      String?  @db.VarChar(255)
-  activo     Boolean  @default(true)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-
-  planificaciones planificacion[]
+  @@map("espacio_sapi")
 }
 
 // ------------------------------
-// Comunas
+// External entities
 // ------------------------------
 
-model comuna {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre     String   @unique @db.VarChar(255)
-  slug       String   @unique @db.VarChar(255)
-  municipio  String?  @db.VarChar(100)
-  activo     Boolean  @default(true)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+model Entity {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @map("nombre") @db.VarChar(255)
+  acronym   String?  @map("sigla") @db.VarChar(50)
+  type      String?  @map("tipo") @db.VarChar(50)
+  isActive  Boolean  @default(true) @map("activo")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  ejecuciones ejecucion_comuna[]
+  planningsAsResponsible Planning[] @relation("ResponsibleEntity")
+  planningsAsConvoker    Planning[] @relation("ConvokingInstitution")
+
+  @@map("entidad")
 }
 
 // ------------------------------
-// Ubicación geográfica
+// Contacts
 // ------------------------------
 
-model ubicacion {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  estado          String   @db.VarChar(100)
-  municipio       String   @db.VarChar(100)
-  parroquia       String?  @db.VarChar(100)
-  direccion_exacta String? @db.Text
-  lugar_nombre    String?  @db.VarChar(255)
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
+model Contact {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @map("nombre") @db.VarChar(255)
+  phone     String   @map("telefono") @db.VarChar(50)
+  email     String?  @db.VarChar(255)
+  position  String?  @map("cargo") @db.VarChar(255)
+  isActive  Boolean  @default(true) @map("activo")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  planificaciones planificacion[]
-  ejecuciones     ejecucion[]
+  plannings Planning[]
 
-  @@unique([estado, municipio, parroquia, direccion_exacta])
-  @@index([estado, municipio])
+  @@map("contacto")
 }
 
 // ------------------------------
-// Actividad (núcleo con flujo de aprobación y ejecución)
+// Communes
 // ------------------------------
 
-enum estado_aprobacion {
-  PENDIENTE
-  APROBADA
-  RECHAZADA
-}
+model Commune {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String   @unique @map("nombre") @db.VarChar(255)
+  slug         String   @unique @db.VarChar(255)
+  municipality String?  @map("municipio") @db.VarChar(100)
+  isActive     Boolean  @default(true) @map("activo")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-enum estado_ejecucion {
-  PLANIFICADA
-  EJECUTADA
-  CANCELADA
-  REPROGRAMADA
-}
+  executionCommunes ExecutionCommune[]
 
-model actividad {
-  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre        String            @db.VarChar(255)
-  descripcion   String?           @db.Text
-  estado_aprobacion estado_aprobacion @default(PENDIENTE)
-  estado_ejecucion  estado_ejecucion  @default(PLANIFICADA)
-  created_at    DateTime          @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime          @updatedAt @db.Timestamptz(6)
-  deleted_at    DateTime?         @db.Timestamptz(6)
-
-  creado_por_id String           @db.Uuid
-  creado_por    usuarios         @relation("Creador", fields: [creado_por_id], references: [id])
-  aprobado_por_id String?        @db.Uuid
-  aprobado_por  usuarios?        @relation("Aprobador", fields: [aprobado_por_id], references: [id])
-  fecha_aprobacion DateTime?     @db.Timestamptz(6)
-  motivo_rechazo String?         @db.Text
-
-  planificacion planificacion?
-  ejecucion     ejecucion?
-  logs          log_actividad[]
-
-  @@index([estado_aprobacion])
-  @@index([estado_ejecucion])
-  @@index([creado_por_id])
-  @@index([aprobado_por_id])
-  @@index([created_at])
+  @@map("comuna")
 }
 
 // ------------------------------
-// Planificación (incluye duración estimada)
+// Geographic location
 // ------------------------------
 
-model planificacion {
-  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  actividad_id               String   @unique @db.Uuid
-  fecha_ejecucion_planeada   DateTime @db.Timestamptz(6)
-  hora_actividad             String   @db.VarChar(5)   // "09:00"
-  duracion_estimada_minutos  Int      //  por ejemplo 120 (2 horas)
+model Location {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  state        String   @map("estado") @db.VarChar(100)
+  municipality String   @map("municipio") @db.VarChar(100)
+  parish       String?  @map("parroquia") @db.VarChar(100)
+  exactAddress String?  @map("direccion_exacta") @db.Text
+  placeName    String?  @map("lugar_nombre") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  ente_encargado_id          String?  @db.Uuid
-  ente_encargado_otro        String?  @db.VarChar(255)
+  plannings  Planning[]
+  executions Execution[]
 
-  institucion_convoca_id     String?  @db.Uuid
-
-  oficina_responsable_id     String   @db.Uuid
-
-  trabajador_contacto_id     String?  @db.Uuid
-
-  participacion_autoridades_id String? @db.Uuid
-
-  observaciones              String?  @db.Text
-  requerimientos_adicionales String?  @db.Text
-
-  espacio_sapi_id            String?  @db.Uuid
-
-  tipo_actividad_id          String   @db.Uuid
-  prioridad_id               String   @db.Uuid
-  vertice_impacto_id         String?  @db.Uuid
-
-  ubicacion_id               String   @db.Uuid
-
-  created_at                 DateTime @default(now()) @db.Timestamptz(6)
-  updated_at                 DateTime @updatedAt @db.Timestamptz(6)
-
-  actividad                actividad                         @relation(fields: [actividad_id], references: [id])
-  ente_encargado           entidad?                          @relation("EnteEncargado", fields: [ente_encargado_id], references: [id])
-  institucion_convoca      entidad?                          @relation("InstitucionConvoca", fields: [institucion_convoca_id], references: [id])
-  oficina_responsable      areas                             @relation("OficinaResponsable", fields: [oficina_responsable_id], references: [id])
-  trabajador_contacto      contacto?                         @relation(fields: [trabajador_contacto_id], references: [id])
-  participacion_autoridades opcion_participacion_autoridades? @relation(fields: [participacion_autoridades_id], references: [id])
-  espacio_sapi             espacio_sapi?                     @relation(fields: [espacio_sapi_id], references: [id])
-  tipo_actividad           tipo_actividad                    @relation(fields: [tipo_actividad_id], references: [id])
-  prioridad                prioridad                         @relation(fields: [prioridad_id], references: [id])
-  vertice_impacto          vertice_impacto?                  @relation(fields: [vertice_impacto_id], references: [id])
-  ubicacion                ubicacion                         @relation(fields: [ubicacion_id], references: [id])
-
-  @@index([fecha_ejecucion_planeada])
-  @@index([oficina_responsable_id])
-  @@index([tipo_actividad_id])
-  @@index([espacio_sapi_id])
+  @@unique([state, municipality, parish, exactAddress])
+  @@index([state, municipality])
+  @@map("ubicacion")
 }
 
 // ------------------------------
-// Ejecución (incluye duración real)
+// Activity (core with approval & execution flow)
 // ------------------------------
 
-model ejecucion {
-  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  actividad_id               String   @unique @db.Uuid
-  fecha_ejecucion_real       DateTime @db.Timestamptz(6)
-  duracion_real_minutos      Int?     // opcional, puede ser diferente a la estimada
-  objetivo_actividad         String   @db.Text
-  descripcion_ejecucion      String   @db.Text
-  cantidad_personas          Int
-  total_masculino            Int
-  total_femenino             Int
+enum ApprovalStatus {
+  PENDING   @map("PENDIENTE")
+  APPROVED  @map("APROBADA")
+  REJECTED  @map("RECHAZADA")
 
-  linea_estrategica_id       String   @db.Uuid
-  ubicacion_id               String   @db.Uuid
-  oficina_ejecutora_id       String   @db.Uuid
-  ejecutado_por_id           String   @db.Uuid
+  @@map("estado_aprobacion")
+}
 
-  created_at                 DateTime @default(now()) @db.Timestamptz(6)
-  updated_at                 DateTime @updatedAt @db.Timestamptz(6)
+enum ExecutionStatus {
+  PLANNED     @map("PLANIFICADA")
+  EXECUTED    @map("EJECUTADA")
+  CANCELLED   @map("CANCELADA")
+  RESCHEDULED @map("REPROGRAMADA")
 
-  actividad                actividad                @relation(fields: [actividad_id], references: [id])
-  linea_estrategica        linea_estrategica        @relation(fields: [linea_estrategica_id], references: [id])
-  ubicacion                ubicacion                @relation(fields: [ubicacion_id], references: [id])
-  oficina_ejecutora        areas                    @relation("OficinaEjecutora", fields: [oficina_ejecutora_id], references: [id])
-  ejecutado_por            usuarios                 @relation("Ejecutor", fields: [ejecutado_por_id], references: [id])
+  @@map("estado_ejecucion")
+}
 
-  publicos_atendidos       actividad_publico[]
-  comunas_atendidas        ejecucion_comuna[]
+model Activity {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String          @map("nombre") @db.VarChar(255)
+  description     String?         @map("descripcion") @db.Text
+  approvalStatus  ApprovalStatus  @default(PENDING) @map("estado_aprobacion")
+  executionStatus ExecutionStatus @default(PLANNED) @map("estado_ejecucion")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?       @map("deleted_at") @db.Timestamptz(6)
 
-  @@index([fecha_ejecucion_real])
-  @@index([linea_estrategica_id])
-  @@index([oficina_ejecutora_id])
+  createdById     String  @map("creado_por_id") @db.Uuid
+  createdBy       User    @relation("Creator", fields: [createdById], references: [id])
+  approvedById    String? @map("aprobado_por_id") @db.Uuid
+  approvedBy      User?   @relation("Approver", fields: [approvedById], references: [id])
+  approvalDate    DateTime? @map("fecha_aprobacion") @db.Timestamptz(6)
+  rejectionReason String? @map("motivo_rechazo") @db.Text
+
+  planning  Planning?
+  execution Execution?
+  logs      ActivityLog[]
+
+  @@index([approvalStatus])
+  @@index([executionStatus])
+  @@index([createdById])
+  @@index([approvedById])
+  @@index([createdAt])
+  @@map("actividad")
 }
 
 // ------------------------------
-// Tablas puente
+// Planning (includes estimated duration)
 // ------------------------------
 
-model actividad_publico {
-  ejecucion_id     String        @db.Uuid
-  tipo_publico_id  String        @db.Uuid
-  cantidad         Int?
-  observacion      String?       @db.Text
+model Planning {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activityId               String   @unique @map("actividad_id") @db.Uuid
+  plannedExecutionDate     DateTime @map("fecha_ejecucion_planeada") @db.Timestamptz(6)
+  activityTime             String   @map("hora_actividad") @db.VarChar(5)
+  estimatedDurationMinutes Int      @map("duracion_estimada_minutos")
 
-  ejecucion        ejecucion     @relation(fields: [ejecucion_id], references: [id])
-  tipo_publico     tipo_publico  @relation(fields: [tipo_publico_id], references: [id])
+  responsibleEntityId    String? @map("ente_encargado_id") @db.Uuid
+  responsibleEntityOther String? @map("ente_encargado_otro") @db.VarChar(255)
 
-  @@id([ejecucion_id, tipo_publico_id])
-  @@index([tipo_publico_id])
+  convokingInstitutionId String? @map("institucion_convoca_id") @db.Uuid
+
+  responsibleOfficeId String  @map("oficina_responsable_id") @db.Uuid
+
+  contactWorkerId String? @map("trabajador_contacto_id") @db.Uuid
+
+  authorityParticipationId String? @map("participacion_autoridades_id") @db.Uuid
+
+  observations           String? @map("observaciones") @db.Text
+  additionalRequirements String? @map("requerimientos_adicionales") @db.Text
+
+  sapiSpaceId String? @map("espacio_sapi_id") @db.Uuid
+
+  activityTypeId  String  @map("tipo_actividad_id") @db.Uuid
+  priorityId      String  @map("prioridad_id") @db.Uuid
+  impactVertexId  String? @map("vertice_impacto_id") @db.Uuid
+
+  locationId String @map("ubicacion_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  activity               Activity                       @relation(fields: [activityId], references: [id])
+  responsibleEntity      Entity?                        @relation("ResponsibleEntity", fields: [responsibleEntityId], references: [id])
+  convokingInstitution   Entity?                        @relation("ConvokingInstitution", fields: [convokingInstitutionId], references: [id])
+  responsibleOffice      Area                           @relation("ResponsibleOffice", fields: [responsibleOfficeId], references: [id])
+  contactWorker          Contact?                       @relation(fields: [contactWorkerId], references: [id])
+  authorityParticipation AuthorityParticipationOption?  @relation(fields: [authorityParticipationId], references: [id])
+  sapiSpace              SapiSpace?                     @relation(fields: [sapiSpaceId], references: [id])
+  activityType           ActivityType                   @relation(fields: [activityTypeId], references: [id])
+  priority               Priority                       @relation(fields: [priorityId], references: [id])
+  impactVertex           ImpactVertex?                  @relation(fields: [impactVertexId], references: [id])
+  location               Location                       @relation(fields: [locationId], references: [id])
+
+  @@index([plannedExecutionDate])
+  @@index([responsibleOfficeId])
+  @@index([activityTypeId])
+  @@index([sapiSpaceId])
+  @@map("planificacion")
 }
 
-model ejecucion_comuna {
-  ejecucion_id   String   @db.Uuid
-  comuna_id      String   @db.Uuid
-  observacion    String?  @db.Text
+// ------------------------------
+// Execution (includes real duration)
+// ------------------------------
 
-  ejecucion      ejecucion @relation(fields: [ejecucion_id], references: [id])
-  comuna         comuna    @relation(fields: [comuna_id], references: [id])
+model Execution {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activityId           String   @unique @map("actividad_id") @db.Uuid
+  realExecutionDate    DateTime @map("fecha_ejecucion_real") @db.Timestamptz(6)
+  realDurationMinutes  Int?     @map("duracion_real_minutos")
+  activityObjective    String   @map("objetivo_actividad") @db.Text
+  executionDescription String   @map("descripcion_ejecucion") @db.Text
+  peopleCount          Int      @map("cantidad_personas")
+  totalMale            Int      @map("total_masculino")
+  totalFemale          Int      @map("total_femenino")
 
-  @@id([ejecucion_id, comuna_id])
-  @@index([comuna_id])
+  strategicLineId  String @map("linea_estrategica_id") @db.Uuid
+  locationId       String @map("ubicacion_id") @db.Uuid
+  executingOfficeId String @map("oficina_ejecutora_id") @db.Uuid
+  executedById     String @map("ejecutado_por_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  activity        Activity      @relation(fields: [activityId], references: [id])
+  strategicLine   StrategicLine @relation(fields: [strategicLineId], references: [id])
+  location        Location      @relation(fields: [locationId], references: [id])
+  executingOffice Area          @relation("ExecutingOffice", fields: [executingOfficeId], references: [id])
+  executedBy      User          @relation("Executor", fields: [executedById], references: [id])
+
+  audiencesServed ActivityAudience[]
+  communesServed  ExecutionCommune[]
+
+  @@index([realExecutionDate])
+  @@index([strategicLineId])
+  @@index([executingOfficeId])
+  @@map("ejecucion")
 }
 
 // ------------------------------
-// Auditoría
+// Bridge tables
 // ------------------------------
 
-model log_actividad {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  actividad_id    String   @db.Uuid
-  usuario_id      String   @db.Uuid
-  accion          String   @db.VarChar(50)
-  estado_anterior_aprobacion String? @db.VarChar(30)
-  estado_nuevo_aprobacion   String? @db.VarChar(30)
-  estado_anterior_ejecucion String? @db.VarChar(30)
-  estado_nuevo_ejecucion   String? @db.VarChar(30)
-  detalles        Json?
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
+model ActivityAudience {
+  executionId    String  @map("ejecucion_id") @db.Uuid
+  audienceTypeId String  @map("tipo_publico_id") @db.Uuid
+  quantity       Int?    @map("cantidad")
+  observation    String? @map("observacion") @db.Text
 
-  actividad      actividad @relation(fields: [actividad_id], references: [id])
-  usuario        usuarios  @relation(fields: [usuario_id], references: [id])
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@index([actividad_id])
-  @@index([usuario_id])
-  @@index([created_at])
+  execution    Execution    @relation(fields: [executionId], references: [id])
+  audienceType AudienceType @relation(fields: [audienceTypeId], references: [id])
+
+  @@id([executionId, audienceTypeId])
+  @@index([audienceTypeId])
+  @@map("actividad_publico")
+}
+
+model ExecutionCommune {
+  executionId String  @map("ejecucion_id") @db.Uuid
+  communeId   String  @map("comuna_id") @db.Uuid
+  observation String? @map("observacion") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  execution Execution @relation(fields: [executionId], references: [id])
+  commune   Commune   @relation(fields: [communeId], references: [id])
+
+  @@id([executionId, communeId])
+  @@index([communeId])
+  @@map("ejecucion_comuna")
+}
+
+// ------------------------------
+// Audit log
+// ------------------------------
+
+model ActivityLog {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activityId              String   @map("actividad_id") @db.Uuid
+  userId                  String   @map("usuario_id") @db.Uuid
+  action                  String   @map("accion") @db.VarChar(50)
+  previousApprovalStatus  String?  @map("estado_anterior_aprobacion") @db.VarChar(30)
+  newApprovalStatus       String?  @map("estado_nuevo_aprobacion") @db.VarChar(30)
+  previousExecutionStatus String?  @map("estado_anterior_ejecucion") @db.VarChar(30)
+  newExecutionStatus      String?  @map("estado_nuevo_ejecucion") @db.VarChar(30)
+  details                 Json?    @map("detalles")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  activity Activity @relation(fields: [activityId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([activityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("log_actividad")
 }

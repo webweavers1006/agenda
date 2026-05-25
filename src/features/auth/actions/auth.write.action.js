@@ -3,11 +3,15 @@
 import { cookies } from "next/headers";
 import { SignJWT } from "jose";
 import { loginSchema } from "@/features/auth/schemas/auth.schema";
-import { authenticateUser } from "@/features/auth/services/auth.service";
+import { authenticateUser } from "@/features/auth/services/auth.write.service";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 const SESSION_DURATION = "8h";
 
+/**
+ * Authenticates a user and sets an HTTP-only session cookie.
+ * Public action — does not require prior session.
+ */
 export async function loginAction(formData) {
   const raw = {
     email: formData.get("email"),
@@ -49,6 +53,9 @@ export async function loginAction(formData) {
   return { success: true, errors: null };
 }
 
+/**
+ * Logs out the current user by deleting the session cookie.
+ */
 export async function logoutAction() {
   const cookieStore = await cookies();
   cookieStore.delete("session");
